@@ -109,7 +109,7 @@ class Window(QMainWindow):
         Загрузка файла с интерфейсом .ui
         '''
 
-        loadUi("gui2_btns.ui",self)
+        loadUi("gui.ui",self)
 
         self.scene = QGraphicsScene(self)
 
