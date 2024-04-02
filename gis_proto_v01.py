@@ -1,10 +1,12 @@
 import sys
 import pandas as pd
-from shapely.geometry import Point, LineString,Polygon
+from shapely.geometry import (
+    Point,
+    LineString,
+    Polygon
+)
 from PyQt5.QtWidgets import (
     QFileDialog,
-    QLineEdit,
-    QPushButton,
     QGraphicsScene,
     QGraphicsItem,
     QGraphicsEllipseItem,
@@ -13,20 +15,21 @@ from PyQt5.QtWidgets import (
     QGraphicsPolygonItem,
     QMainWindow,
     QApplication,
-    QGraphicsView,
     QShortcut
 )
 from PyQt5.uic import loadUi
-from PyQt5 import QtGui
 from PyQt5.QtGui import (
     QPainter,
     QBrush,
     QPen,
-    QFont,
     QPolygonF,
     QKeySequence
 )
-from PyQt5.QtCore import QPointF, QLineF, Qt
+from PyQt5.QtCore import (
+    QPointF,
+    QLineF,
+    Qt
+)
 import itertools
 
 
@@ -34,6 +37,9 @@ class Window(QMainWindow):
 
 
     def deleteItem(self):
+        '''
+        Удаление выделенного объекта
+        '''
         items = self.scene.selectedItems()
         if len(items) != 0:
             for item in items:
@@ -41,36 +47,32 @@ class Window(QMainWindow):
 
 
     def saveNewItems(self):
+        '''
+        Сохранение объектов в файл
+        '''
         items = self.scene.items()
         if len(items) > 0:
             with open('test_save_item.txt', 'w+') as fout:
                 for item in items:
-                    print(item.type())
                     if item.type() == QGraphicsEllipseItem().type():
-                        print("Ellipse", list(item.rect().getCoords()[0:2]))
                         coords = list(item.rect().getCoords()[0:2])
                         row = ' '.join([ str(int(coord)) for coord in coords ])
-                        print(row)
                     elif item.type() == QGraphicsRectItem().type():
                         print("Rectangle", list(item.rect().getCoords()))
-                        # print(row)
                     elif item.type() == QGraphicsLineItem().type():
-                        print("Line", [item.line().p1().x(), item.line().p1().y(), item.line().p2().x(), item.line().p2().y()])
                         coords = [item.line().p1().x(), item.line().p1().y(), item.line().p2().x(), item.line().p2().y()]
                         row = ' '.join([str(int(coord)) for coord in coords])
-                        print(row)
                     elif item.type() == QGraphicsPolygonItem().type():
-                        print("Polygon", [[p.x(), p.y()] for p in item.polygon()])
                         coords = list(itertools.chain.from_iterable([[p.x(), p.y()] for p in item.polygon()]))
                         row = ' '.join([str(int(coord)) for coord in coords])
-                        print(row)
                     fout.writelines(row+'\n')
-                    # print(item)
-                    # writer = csv.writer(fout, delimiter=' ', quoting=csv.QUOTE_MINIMAL)
-                    # writer.writerow(row)
 
 
     def zoom(self, event):
+        '''
+        Изменение зума сцены
+        :param event: событие
+        '''
         zoomInFactor = 1.25
         zoomOutFactor = 1 / zoomInFactor
         if event.angleDelta().y() > 0:
@@ -112,17 +114,14 @@ class Window(QMainWindow):
         loadUi("gui.ui",self)
 
         self.scene = QGraphicsScene(self)
-
         self.graphicsView.setBackgroundBrush(Qt.white)
         self.graphicsView.setDragMode(self.graphicsView.ScrollHandDrag)
         self.graphicsView.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         self.graphicsView.setOptimizationFlag(self.graphicsView.DontAdjustForAntialiasing, True)
-
         self.graphicsView.wheelEvent = self.zoom
         self.graphicsView.mouseMoveEvent = self.mouseMoveEvent
         self.graphicsView.mousePressEvent = self.mousePressEvent
         self.graphicsView.mouseReleaseEvent = self.mouseReleaseEvent
-
         self.graphicsView.startPos = None
         self.blueBrush = QBrush(Qt.blue)
         self.blackPen = QPen(Qt.black)
@@ -131,10 +130,8 @@ class Window(QMainWindow):
         self.bluePen = QPen(Qt.blue)
         self.redPen.setWidth(1)
         self.bluePen.setWidth(1)
-        # points = [QPointF(0, 0), QPointF(100, 100), QPointF(0, 100)]
-        # scene.addPolygon(QPolygonF(points), blackPen, blueBrush)
-
         self.graphicsView.setScene(self.scene)
+
 
     def chunks(self, lst, size):
         '''
@@ -208,20 +205,11 @@ class Window(QMainWindow):
         try:
             if fname != '' and fname is not None:
                 df = self.read_file(fname)
-                # gdf = gpd.GeoDataFrame(
-                #     df,
-                #     geometry=df['geometry'],
-                #     crs="EPSG:4326"
-                # )
-            print('Проверка типов геометрии')
             if (df[df['geom_type'].isna()].shape[0]) > 0:
-                print(1)
                 return [1,df]
             else:
-                print(0)
                 return [0,df]
         except:
-            print(2)
             return [2,None]
 
     def browsefiles(self):
@@ -247,16 +235,17 @@ class Window(QMainWindow):
                 fname = [self.filename.text()]
             status_ = self.button_clicked(fname[0])
             self.statusReadingFile.setText(status_reading[status_[0]])
-            print(status_)
+            items = self.scene.items()
+            if len(items) != 0:
+                for item in items:
+                    self.scene.removeItem(item)
             for index, x in status_[1].iterrows():
-                print(x)
                 if x['geom_type'] == 'Polygon':
                     self.scene.addPolygon(
                         QPolygonF([ QPointF(int(i[0]), int(i[1])) for i in x['coords_pairs']]),
                         self.blackPen
                     )
                 elif x['geom_type'] == 'LineString':
-                    print([QPointF(int(i[0]), int(i[1])) for i in x['coords_pairs']])
                     coords = [ QPointF(int(i[0]), int(i[1])) for i in x['coords_pairs']]
                     self.scene.addLine(
                         QLineF(coords[0],
@@ -282,15 +271,10 @@ class Window(QMainWindow):
         super().__init__()
         self.setWindowTitle("gis_proto_alpha")
         self.create_ui()
-
         self.shortcutSave = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcutSave.activated.connect(self.saveNewItems)
-
         self.shortcutDel = QShortcut(QKeySequence("Delete"), self)
         self.shortcutDel.activated.connect(self.deleteItem)
-
-        # self.nameFile = QLineEdit()
-        # self.button = QPushButton()
         self.browse.clicked.connect(self.browsefiles)
         self.saveBtn.clicked.connect(self.saveNewItems)
         self.delBtn.clicked.connect(self.deleteItem)
