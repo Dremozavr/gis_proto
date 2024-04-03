@@ -15,7 +15,8 @@ from PyQt5.QtWidgets import (
     QGraphicsPolygonItem,
     QMainWindow,
     QApplication,
-    QShortcut
+    QShortcut,
+    QMessageBox
 )
 from PyQt5.uic import loadUi
 from PyQt5.QtGui import (
@@ -31,6 +32,7 @@ from PyQt5.QtCore import (
     Qt
 )
 import itertools
+from gui import Ui_Form
 
 
 class Window(QMainWindow):
@@ -40,33 +42,51 @@ class Window(QMainWindow):
         '''
         Удаление выделенного объекта
         '''
-        items = self.scene.selectedItems()
+        items = self.ui.graphicsView.scene.selectedItems()
         if len(items) != 0:
             for item in items:
-                self.scene.removeItem(item)
+                self.ui.graphicsView.scene.removeItem(item)
 
 
     def saveNewItems(self):
         '''
         Сохранение объектов в файл
         '''
-        items = self.scene.items()
-        if len(items) > 0:
-            with open('test_save_item.txt', 'w+') as fout:
-                for item in items:
-                    if item.type() == QGraphicsEllipseItem().type():
-                        coords = list(item.rect().getCoords()[0:2])
-                        row = ' '.join([ str(int(coord)) for coord in coords ])
-                    elif item.type() == QGraphicsRectItem().type():
-                        print("Rectangle", list(item.rect().getCoords()))
-                    elif item.type() == QGraphicsLineItem().type():
-                        coords = [item.line().p1().x(), item.line().p1().y(), item.line().p2().x(), item.line().p2().y()]
-                        row = ' '.join([str(int(coord)) for coord in coords])
-                    elif item.type() == QGraphicsPolygonItem().type():
-                        coords = list(itertools.chain.from_iterable([[p.x(), p.y()] for p in item.polygon()]))
-                        row = ' '.join([str(int(coord)) for coord in coords])
-                    fout.writelines(row+'\n')
-
+        try:
+            items = self.ui.graphicsView.scene.items()
+            print('saving')
+            if len(items) > 0:
+                with open('test_save_item.txt', 'w+') as fout:
+                    for item in items:
+                        if item.type() == QGraphicsEllipseItem().type():
+                            print('ellips_saving')
+                            coords = list(item.rect().getCoords()[0:2])
+                            row = ' '.join([ str(int(coord)) for coord in coords ])
+                        elif item.type() == QGraphicsRectItem().type():
+                            print("Rectangle", list(item.rect().getCoords()))
+                        elif item.type() == QGraphicsLineItem().type():
+                            print('line_saving')
+                            coords = [item.line().p1().x(), item.line().p1().y(), item.line().p2().x(), item.line().p2().y()]
+                            row = ' '.join([str(int(coord)) for coord in coords])
+                        elif item.type() == QGraphicsPolygonItem().type():
+                            print('poly_saving')
+                            coords = list(itertools.chain.from_iterable([[p.x(), p.y()] for p in item.polygon()]))
+                            row = ' '.join([str(int(coord)) for coord in coords])
+                        fout.writelines(row+'\n')
+                    print('closing saving...')
+                    fout.close()
+            print('succsesfull saving')
+            self.error = QMessageBox()
+            self.error.setText('Файл успешно сохранен')
+            self.error.setIcon(QMessageBox.Warning)
+            self.error.setStandardButtons(QMessageBox.Ok)
+            self.error.exec_()
+        except:
+            self.error = QMessageBox()
+            self.error.setText('Не удалось выполнить сохранение файла')
+            self.error.setIcon(QMessageBox.Warning)
+            self.error.setStandardButtons(QMessageBox.Ok)
+            self.error.exec_()
 
     def zoom(self, event):
         '''
@@ -79,30 +99,35 @@ class Window(QMainWindow):
             zoomFactor = zoomInFactor
         else:
             zoomFactor = zoomOutFactor
-        self.graphicsView.scale(zoomFactor, zoomFactor)
+        self.ui.graphicsView.scale(zoomFactor, zoomFactor)
 
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.graphicsView.startPos = event.pos()
+            self.ui.graphicsView.startPos = event.pos()
+            item = self.ui.graphicsView.itemAt(event.pos().x(), event.pos().y())
+            if item:
+                item.setSelected(1)
+            if item == None:
+                self.ui.graphicsView.scene.clearSelection()
         else:
             super(Window,self).mousePressEvent(event)
 
 
     def mouseMoveEvent(self, event):
-        if self.graphicsView.startPos is not None:
-            delta = self.graphicsView.startPos - event.pos()
-            transform = self.graphicsView.transform()
+        if self.ui.graphicsView.startPos is not None:
+            delta = self.ui.graphicsView.startPos - event.pos()
+            transform = self.ui.graphicsView.transform()
             deltaX = delta.x() / transform.m11()
             deltaY = delta.y() / transform.m22()
-            self.graphicsView.setSceneRect(self.graphicsView.sceneRect().translated(deltaX, deltaY))
-            self.graphicsView.startPos = event.pos()
+            self.ui.graphicsView.setSceneRect(self.ui.graphicsView.sceneRect().translated(deltaX, deltaY))
+            self.ui.graphicsView.startPos = event.pos()
         else:
              super(Window, self).mouseMoveEvent(event)
 
 
     def mouseReleaseEvent(self, event):
-        self.graphicsView.startPos = None
+        self.ui.graphicsView.startPos = None
         super(Window, self).mouseReleaseEvent(event)
 
 
@@ -111,26 +136,30 @@ class Window(QMainWindow):
         Загрузка файла с интерфейсом .ui
         '''
 
-        loadUi("gui.ui",self)
+        self.ui = Ui_Form()
+        self.ui.setupUi(self)
 
-        self.scene = QGraphicsScene(self)
-        self.graphicsView.setBackgroundBrush(Qt.white)
-        self.graphicsView.setDragMode(self.graphicsView.ScrollHandDrag)
-        self.graphicsView.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        self.graphicsView.setOptimizationFlag(self.graphicsView.DontAdjustForAntialiasing, True)
-        self.graphicsView.wheelEvent = self.zoom
-        self.graphicsView.mouseMoveEvent = self.mouseMoveEvent
-        self.graphicsView.mousePressEvent = self.mousePressEvent
-        self.graphicsView.mouseReleaseEvent = self.mouseReleaseEvent
-        self.graphicsView.startPos = None
-        self.blueBrush = QBrush(Qt.blue)
-        self.blackPen = QPen(Qt.black)
-        self.blackPen.setWidth(1)
-        self.redPen = QPen(Qt.black)
-        self.bluePen = QPen(Qt.blue)
-        self.redPen.setWidth(1)
-        self.bluePen.setWidth(1)
-        self.graphicsView.setScene(self.scene)
+        # loadUi("gui.ui",self)
+
+        self.ui.graphicsView.scene = QGraphicsScene(self)
+        self.ui.graphicsView.setBackgroundBrush(Qt.white)
+        self.ui.graphicsView.setDragMode(self.ui.graphicsView.ScrollHandDrag)
+        self.ui.graphicsView.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        self.ui.graphicsView.setOptimizationFlag(self.ui.graphicsView.DontAdjustForAntialiasing, True)
+        self.ui.graphicsView.wheelEvent = self.zoom
+        self.ui.graphicsView.mouseMoveEvent = self.mouseMoveEvent
+        self.ui.graphicsView.mousePressEvent = self.mousePressEvent
+        self.ui.graphicsView.mouseReleaseEvent = self.mouseReleaseEvent
+        self.ui.graphicsView.startPos = None
+        self.ui.blueBrush = QBrush(Qt.blue)
+        self.ui.blackPen = QPen(Qt.black)
+        self.ui.blackPen.setWidth(1)
+        self.ui.redPen = QPen(Qt.black)
+        self.ui.bluePen = QPen(Qt.blue)
+        self.ui.redPen.setWidth(1)
+        self.ui.bluePen.setWidth(1)
+        self.ui.graphicsView.setScene(self.ui.graphicsView.scene)
+
 
 
     def chunks(self, lst, size):
@@ -224,48 +253,48 @@ class Window(QMainWindow):
         }
 
         try:
-            if self.filename.text() == '' or self.filename.text() is None:
+            if self.ui.filename.text() == '' or self.ui.filename.text() is None:
                 fname = QFileDialog.getOpenFileName(
                     self,
                     'Open file',
                     r'C:\Users'
                 )
-                self.filename.setText(fname[0])
+                self.ui.filename.setText(fname[0])
             else:
-                fname = [self.filename.text()]
+                fname = [self.ui.filename.text()]
             status_ = self.button_clicked(fname[0])
-            self.statusReadingFile.setText(status_reading[status_[0]])
-            items = self.scene.items()
+            self.ui.statusReadingFile.setText(status_reading[status_[0]])
+            items = self.ui.graphicsView.scene.items()
             if len(items) != 0:
                 for item in items:
-                    self.scene.removeItem(item)
+                    self.ui.graphicsView.scene.removeItem(item)
             for index, x in status_[1].iterrows():
                 if x['geom_type'] == 'Polygon':
-                    self.scene.addPolygon(
+                    self.ui.graphicsView.scene.addPolygon(
                         QPolygonF([ QPointF(int(i[0]), int(i[1])) for i in x['coords_pairs']]),
-                        self.blackPen
+                        self.ui.blackPen
                     )
                 elif x['geom_type'] == 'LineString':
                     coords = [ QPointF(int(i[0]), int(i[1])) for i in x['coords_pairs']]
-                    self.scene.addLine(
+                    self.ui.graphicsView.scene.addLine(
                         QLineF(coords[0],
                                coords[1]),
-                        self.bluePen
+                        self.ui.bluePen
                     )
                 elif x['geom_type'] == 'Point':
-                    self.scene.addEllipse(
+                    self.ui.graphicsView.scene.addEllipse(
                         int(x['coords_pairs'][0][0]),
                         int(x['coords_pairs'][0][1]),
                         1,
                         1,
-                        self.redPen
+                        self.ui.redPen
                     )
                 else:
                     continue
-                for item in self.scene.items():
+                for item in self.ui.graphicsView.scene.items():
                     item.setFlag(QGraphicsItem.ItemIsSelectable)
         except:
-            self.statusReadingFile.setText(status_reading[2])
+            self.ui.statusReadingFile.setText(status_reading[2])
 
     def __init__(self):
         super().__init__()
@@ -275,9 +304,9 @@ class Window(QMainWindow):
         self.shortcutSave.activated.connect(self.saveNewItems)
         self.shortcutDel = QShortcut(QKeySequence("Delete"), self)
         self.shortcutDel.activated.connect(self.deleteItem)
-        self.browse.clicked.connect(self.browsefiles)
-        self.saveBtn.clicked.connect(self.saveNewItems)
-        self.delBtn.clicked.connect(self.deleteItem)
+        self.ui.browse.clicked.connect(self.browsefiles)
+        self.ui.saveBtn.clicked.connect(self.saveNewItems)
+        self.ui.delBtn.clicked.connect(self.deleteItem)
 
         self.show()
 

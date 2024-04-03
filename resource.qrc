@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>icons/remove-circle-svgrepo-com.svg</file>
+    <file>icons/save-svgrepo-com.svg</file>
+    <file>icons/browse-svgrepo-com.svg</file>
+  </qresource>
+</RCC>
